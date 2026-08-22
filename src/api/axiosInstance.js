@@ -3,7 +3,7 @@ import axios from "axios";
 // Create an Axios instance with default settings
 axios.defaults.withCredentials = true;
 const axiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE_URL + "/api",
+  baseURL: "/api",
   headers: {
     "Content-Type": "application/json",
   },
