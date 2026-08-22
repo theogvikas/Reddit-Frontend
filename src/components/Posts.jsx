@@ -10,13 +10,9 @@ function getTimeElapsed(date) {
   const currentTime = new Date();
   const givenTime = new Date(date);
 
-  // Calculate the difference in milliseconds
   const timeDifference = currentTime - givenTime;
-
-  // Convert milliseconds to minutes
   const minutes = Math.floor(timeDifference / (1000 * 60));
 
-  // Check if the hour count is 24 or more and return days if so
   if (minutes >= 24 * 60) {
     const days = Math.floor((minutes / 24) * 60);
     return `${days} day${days > 1 ? "s" : ""} ago`;
@@ -33,7 +29,6 @@ function getTimeElapsed(date) {
 const countVotes = (votes, voteType) => {
   const count = votes.filter((vote) => vote.voteType === voteType).length;
 
-  // Format the count based on its value
   if (count >= 1_000_000) {
     return `${(count / 1_000_000).toFixed(1)}M`;
   } else if (count >= 1_000) {
@@ -71,7 +66,6 @@ const Posts = () => {
   const [loading, setLoading] = useState(false);
   const { user } = useSelector((state) => state);
 
-  // Function to fetch posts
   const getPosts = async () => {
     if (pageNo >= lastPage || loading) return;
 
@@ -93,7 +87,6 @@ const Posts = () => {
     getPosts();
   }, [pageNo]);
 
-  // Function to handle votes
   const handleVoting = async (postId, voteType) => {
     console.log(postId, voteType);
     const response = await handleVote(postId, voteType);
@@ -113,7 +106,6 @@ const Posts = () => {
     }
   };
 
-  // debounce function to prevent continuous call to handleScroll
   function debounce(func, delay) {
     let timeoutId;
     return function (...args) {
@@ -128,8 +120,7 @@ const Posts = () => {
 
   const handleScroll = () => {
     if (
-      document.body.scrollHeight - 300 <
-      window.scrollY + window.innerHeight
+      document.body.scrollHeight - 300 < window.scrollY + window.innerHeight
     ) {
       setpageNo((curr) => curr + 1);
     }
@@ -155,9 +146,11 @@ const Posts = () => {
                 </ul>
               </div>
               <div className="flex flex-row gap-x-2">
-                <button className="bg-blue-700 font-semibold py-1 px-2 rounded-full">
-                  Join
-                </button>
+                {post.createdBy.username !== user.username && (
+                  <button className="bg-blue-700 font-semibold py-1 px-2 rounded-full">
+                    Join
+                  </button>
+                )}
                 <button className="self-start text-base py-1 px-2 hover:bg-[#ffffff29] rounded-full leading-none font-semibold">
                   ...
                 </button>
@@ -182,13 +175,9 @@ const Posts = () => {
             <div className="flex flex-row mt-3 text-lg gap-x-4">
               <div
                 className={`flex flex-row flex-nowrap items-center gap-x-2 bg-gray-600 rounded-full ${
-                  checkCurrentUserVote(post.votes, user.username).voteType ===
-                    "yes" && "bg-[#fd523c]"
-                }
-                    ${
-                      checkCurrentUserVote(post.votes, user.username)
-                        .voteType === "no" && "bg-[#5f3cfd]"
-                    }
+                  checkCurrentUserVote(post.votes, user.username).voteType === "yes" && "bg-[#fd523c]"
+                } ${
+                  checkCurrentUserVote(post.votes, user.username).voteType === "no" && "bg-[#5f3cfd]"
                 }`}
               >
                 <button
@@ -226,7 +215,7 @@ const Posts = () => {
         ))
       ) : (
         <p className="text-xl font-semibold text-center">
-          You’ve seen it all! Time to create a post of your own?
+          You've seen it all! Time to create a post of your own?
         </p>
       )}
     </div>
