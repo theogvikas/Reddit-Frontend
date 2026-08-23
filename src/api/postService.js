@@ -36,3 +36,31 @@ export const createPost = async (postData) => {
     return { isSuccess: false, errMsg: "Something went wrong!" };
   }
 };
+
+// Function to edit an existing post
+export const updatePost = async (postId, postData) => {
+  try {
+    const response = await axiosInstance.put(
+      `/post/update-post/${postId}`,
+      postData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    return { isSuccess: false, errMsg: "Something went wrong!" };
+  }
+};
+
+// Function to delete a post
+export const deletePost = async (postId) => {
+  try {
+    const response = await axiosInstance.delete(`/post/delete-post/${postId}`);
+    return response.data;
+  } catch (error) {
+    return { isSuccess: false, errMsg: "Something went wrong!" };
+  }
+};

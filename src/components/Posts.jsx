@@ -3,7 +3,8 @@ import { TbArrowBigUp, TbArrowBigDown } from "react-icons/tb";
 import { FaRegComment } from "react-icons/fa";
 import { PiShareFat } from "react-icons/pi";
 import { useEffect, useState } from "react";
-import { fetchPosts, handleVote } from "../api/postService";
+import { fetchPosts, handleVote, updatePost, deletePost } from "../api/postService";
+import { followUser } from "../api/userService";
 import { useSelector } from "react-redux";
 
 function getTimeElapsed(date) {
@@ -66,6 +67,21 @@ const Posts = () => {
   const [loading, setLoading] = useState(false);
   const { user } = useSelector((state) => state);
 
+  // which post's "..." menu is currently open
+  const [openMenuPostId, setOpenMenuPostId] = useState(null);
+
+  // which post is currently being edited
+  const [editingPostId, setEditingPostId] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editMedia, setEditMedia] = useState(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  // track which user ids the current user is following
+  const [followingIds, setFollowingIds] = useState(
+    (user?.following || []).map((id) => id.toString())
+  );
+
   const getPosts = async () => {
     if (pageNo >= lastPage || loading) return;
 
@@ -88,7 +104,6 @@ const Posts = () => {
   }, [pageNo]);
 
   const handleVoting = async (postId, voteType) => {
-    console.log(postId, voteType);
     const response = await handleVote(postId, voteType);
 
     if (response.isSuccess) {
@@ -102,6 +117,19 @@ const Posts = () => {
         });
 
         return updatedData;
+      });
+    }
+  };
+
+  const handleJoin = async (userId) => {
+    const response = await followUser(userId);
+
+    if (response.isSuccess) {
+      setFollowingIds((curr) => {
+        if (response.isFollowing) {
+          return [...curr, userId];
+        }
+        return curr.filter((id) => id !== userId);
       });
     }
   };
@@ -128,6 +156,55 @@ const Posts = () => {
 
   window.addEventListener("scroll", debounce(handleScroll, 500));
 
+  const startEditing = (post) => {
+    setEditingPostId(post._id);
+    setEditTitle(post.title);
+    setEditDescription(post.description || "");
+    setEditMedia(null);
+    setOpenMenuPostId(null);
+  };
+
+  const cancelEditing = () => {
+    setEditingPostId(null);
+    setEditTitle("");
+    setEditDescription("");
+    setEditMedia(null);
+  };
+
+  const submitEdit = async (postId) => {
+    if (!editTitle.trim()) return;
+
+    setEditSubmitting(true);
+    const formData = new FormData();
+    formData.append("title", editTitle);
+    formData.append("description", editDescription);
+    if (editMedia) {
+      formData.append("media", editMedia);
+    }
+
+    const response = await updatePost(postId, formData);
+    setEditSubmitting(false);
+
+    if (response.isSuccess) {
+      const updatedPost = response.post;
+      setPosts((curr) =>
+        curr.map((post) => (post._id === postId ? updatedPost : post))
+      );
+      cancelEditing();
+    }
+  };
+
+  const handleDelete = async (postId) => {
+    setOpenMenuPostId(null);
+    const confirmed = window.confirm("Are you sure you want to delete this post?");
+    if (!confirmed) return;
+
+    const response = await deletePost(postId);
+    if (response.isSuccess) {
+      setPosts((curr) => curr.filter((post) => post._id !== postId));
+    }
+  };
+
   return (
     <div className="w-full p-5 desktop:border-x-[1px] desktop:min-h-[100vh] flex flex-col ">
       {loading ? (
@@ -145,72 +222,147 @@ const Posts = () => {
                   <li>{getTimeElapsed(post.createdAt)}</li>
                 </ul>
               </div>
-              <div className="flex flex-row gap-x-2">
+              <div className="flex flex-row gap-x-2 relative">
                 {post.createdBy.username !== user.username && (
-                  <button className="bg-blue-700 font-semibold py-1 px-2 rounded-full">
-                    Join
+                  <button
+                    onClick={() => handleJoin(post.createdBy._id)}
+                    className="bg-blue-700 font-semibold py-1 px-2 rounded-full"
+                  >
+                    {followingIds.includes(post.createdBy._id) ? "Joined" : "Join"}
                   </button>
                 )}
-                <button className="self-start text-base py-1 px-2 hover:bg-[#ffffff29] rounded-full leading-none font-semibold">
+                <button
+                  onClick={() =>
+                    setOpenMenuPostId((curr) =>
+                      curr === post._id ? null : post._id
+                    )
+                  }
+                  className="self-start text-base py-1 px-2 hover:bg-[#ffffff29] rounded-full leading-none font-semibold"
+                >
                   ...
                 </button>
+                {openMenuPostId === post._id &&
+                  post.createdBy.username === user.username && (
+                    <div className="absolute right-0 top-8 bg-[#1a1a1b] border border-[#343536] rounded-md shadow-lg z-50 min-w-[120px]">
+                      <button
+                        onClick={() => startEditing(post)}
+                        className="w-full text-left px-4 py-2 hover:bg-[#2b2d30] text-sm"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(post._id)}
+                        className="w-full text-left px-4 py-2 hover:bg-[#2b2d30] text-sm text-red-500"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
               </div>
             </div>
-            <div className="flex flex-col gap-y-3 ">
-              <p className="text-xl font-bold">{post.title}</p>
-              <p className="text-base">{post.description}</p>
-              {post.imageUrl && (
-                <div
-                  className="rounded-md overflow-hidden flex flex-row justify-center max-h-[450px]"
-                  style={{ borderRadius: "12px" }}
-                >
+
+            {editingPostId === post._id ? (
+              <div className="flex flex-col gap-y-3 mt-2">
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Title"
+                  className="bg-transparent w-full border-[1px] border-textSecondary p-3 text-lg rounded-xl"
+                />
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Description"
+                  className="bg-transparent w-full border-[1px] border-textSecondary p-3 text-lg rounded-xl"
+                />
+                {post.imageUrl && !editMedia && (
                   <img
                     src={post.imageUrl}
-                    className="object-contain max-h-full max-w-full"
+                    className="object-contain max-h-[200px]"
                     alt=""
                   />
+                )}
+                <input
+                  type="file"
+                  onChange={(e) => setEditMedia(e.target.files[0])}
+                  className="text-sm"
+                />
+                <div className="flex flex-row gap-x-2 justify-end">
+                  <button
+                    onClick={cancelEditing}
+                    className="py-2 px-3 rounded-full hover:bg-[#ffffff29]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={editSubmitting}
+                    onClick={() => submitEdit(post._id)}
+                    className="bg-btnPrimary hover:bg-btnSecondary disabled:bg-bgSecondary py-2 px-3 rounded-full"
+                  >
+                    {editSubmitting ? "Saving..." : "Save"}
+                  </button>
                 </div>
-              )}
-            </div>
-            <div className="flex flex-row mt-3 text-lg gap-x-4">
-              <div
-                className={`flex flex-row flex-nowrap items-center gap-x-2 bg-gray-600 rounded-full ${
-                  checkCurrentUserVote(post.votes, user.username).voteType === "yes" && "bg-[#fd523c]"
-                } ${
-                  checkCurrentUserVote(post.votes, user.username).voteType === "no" && "bg-[#5f3cfd]"
-                }`}
-              >
-                <button
-                  onClick={() => handleVoting(post._id, "yes")}
-                  className="p-2 hover:bg-gray-800 rounded-full hover:text-red-500"
-                >
-                  {checkCurrentUserVote(post.votes, user.username).voteType ===
-                  "yes" ? (
-                    <TbArrowBigUp fill="#fff" className="text-white" />
-                  ) : (
-                    <TbArrowBigUp />
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-y-3 ">
+                  <p className="text-xl font-bold">{post.title}</p>
+                  <p className="text-base">{post.description}</p>
+                  {post.imageUrl && (
+                    <div
+                      className="rounded-md overflow-hidden flex flex-row justify-center max-h-[450px]"
+                      style={{ borderRadius: "12px" }}
+                    >
+                      <img
+                        src={post.imageUrl}
+                        className="object-contain max-h-full max-w-full"
+                        alt=""
+                      />
+                    </div>
                   )}
-                </button>{" "}
-                {getConditionalVoteCount(post.votes, user.username).voteCount}{" "}
-                <button
-                  onClick={() => handleVoting(post._id, "no")}
-                  className="p-2 hover:bg-gray-800 rounded-full hover:text-[#5f3cfd]"
-                >
-                  {checkCurrentUserVote(post.votes, user.username).voteType ===
-                  "no" ? (
-                    <TbArrowBigDown fill="#fff" className="text-white" />
-                  ) : (
-                    <TbArrowBigDown />
-                  )}
-                </button>
-              </div>
-              <div className="flex flex-row items-center gap-x-2 bg-gray-600 rounded-full px-2 py-1">
-                <FaRegComment /> 0
-              </div>
-              <div className="flex flex-row items-center gap-x-2 bg-gray-600 rounded-full px-2 py-1">
-                <PiShareFat /> Share
-              </div>
-            </div>
+                </div>
+                <div className="flex flex-row mt-3 text-lg gap-x-4">
+                  <div
+                    className={`flex flex-row flex-nowrap items-center gap-x-2 bg-gray-600 rounded-full ${
+                      checkCurrentUserVote(post.votes, user.username).voteType === "yes" && "bg-[#fd523c]"
+                    } ${
+                      checkCurrentUserVote(post.votes, user.username).voteType === "no" && "bg-[#5f3cfd]"
+                    }`}
+                  >
+                    <button
+                      onClick={() => handleVoting(post._id, "yes")}
+                      className="p-2 hover:bg-gray-800 rounded-full hover:text-red-500"
+                    >
+                      {checkCurrentUserVote(post.votes, user.username).voteType ===
+                      "yes" ? (
+                        <TbArrowBigUp fill="#fff" className="text-white" />
+                      ) : (
+                        <TbArrowBigUp />
+                      )}
+                    </button>{" "}
+                    {getConditionalVoteCount(post.votes, user.username).voteCount}{" "}
+                    <button
+                      onClick={() => handleVoting(post._id, "no")}
+                      className="p-2 hover:bg-gray-800 rounded-full hover:text-[#5f3cfd]"
+                    >
+                      {checkCurrentUserVote(post.votes, user.username).voteType ===
+                      "no" ? (
+                        <TbArrowBigDown fill="#fff" className="text-white" />
+                      ) : (
+                        <TbArrowBigDown />
+                      )}
+                    </button>
+                  </div>
+                  <div className="flex flex-row items-center gap-x-2 bg-gray-600 rounded-full px-2 py-1">
+                    <FaRegComment /> 0
+                  </div>
+                  <div className="flex flex-row items-center gap-x-2 bg-gray-600 rounded-full px-2 py-1">
+                    <PiShareFat /> Share
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         ))
       ) : (
