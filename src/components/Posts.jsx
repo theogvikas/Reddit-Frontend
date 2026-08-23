@@ -2,10 +2,12 @@ import { FaUser } from "react-icons/fa";
 import { TbArrowBigUp, TbArrowBigDown } from "react-icons/tb";
 import { FaRegComment } from "react-icons/fa";
 import { PiShareFat } from "react-icons/pi";
+import { FaWhatsapp, FaXTwitter, FaFacebook, FaLink } from "react-icons/fa6";
 import { useEffect, useState } from "react";
 import { fetchPosts, handleVote, updatePost, deletePost } from "../api/postService";
 import { followUser } from "../api/userService";
 import { useSelector } from "react-redux";
+import Modal from "./Modal";
 
 function getTimeElapsed(date) {
   const currentTime = new Date();
@@ -15,7 +17,7 @@ function getTimeElapsed(date) {
   const minutes = Math.floor(timeDifference / (1000 * 60));
 
   if (minutes >= 24 * 60) {
-    const days = Math.floor((minutes / 24) * 60);
+    const days = Math.floor(minutes / (24 * 60));
     return `${days} day${days > 1 ? "s" : ""} ago`;
   } else if (minutes > 60) {
     const hours = Math.floor(minutes / 60);
@@ -60,6 +62,24 @@ function getConditionalVoteCount(votes, currentUser) {
   }
 }
 
+const shareTargets = [
+  {
+    key: "whatsapp",
+    Icon: FaWhatsapp,
+    getUrl: (link) => "https://wa.me/?text=" + encodeURIComponent(link),
+  },
+  {
+    key: "twitter",
+    Icon: FaXTwitter,
+    getUrl: (link) => "https://twitter.com/intent/tweet?url=" + encodeURIComponent(link),
+  },
+  {
+    key: "facebook",
+    Icon: FaFacebook,
+    getUrl: (link) => "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(link),
+  },
+];
+
 const Posts = () => {
   const [pageNo, setpageNo] = useState(1);
   const [posts, setPosts] = useState([]);
@@ -67,20 +87,20 @@ const Posts = () => {
   const [loading, setLoading] = useState(false);
   const { user } = useSelector((state) => state);
 
-  // which post's "..." menu is currently open
   const [openMenuPostId, setOpenMenuPostId] = useState(null);
 
-  // which post is currently being edited
   const [editingPostId, setEditingPostId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editMedia, setEditMedia] = useState(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
-  // track which user ids the current user is following
   const [followingIds, setFollowingIds] = useState(
     (user?.following || []).map((id) => id.toString())
   );
+
+  const [sharePostId, setSharePostId] = useState(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const getPosts = async () => {
     if (pageNo >= lastPage || loading) return;
@@ -203,6 +223,34 @@ const Posts = () => {
     if (response.isSuccess) {
       setPosts((curr) => curr.filter((post) => post._id !== postId));
     }
+  };
+
+  const getShareLink = (postId) => window.location.origin + "/?post=" + postId;
+
+  const openShareModal = (postId) => {
+    setSharePostId(postId);
+    setLinkCopied(false);
+  };
+
+  const closeShareModal = () => {
+    setSharePostId(null);
+    setLinkCopied(false);
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(getShareLink(sharePostId));
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleShareClick = (target) => {
+    if (!sharePostId) return;
+    const url = target.getUrl(getShareLink(sharePostId));
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -357,9 +405,12 @@ const Posts = () => {
                   <div className="flex flex-row items-center gap-x-2 bg-gray-600 rounded-full px-2 py-1">
                     <FaRegComment /> 0
                   </div>
-                  <div className="flex flex-row items-center gap-x-2 bg-gray-600 rounded-full px-2 py-1">
+                  <button
+                    onClick={() => openShareModal(post._id)}
+                    className="flex flex-row items-center gap-x-2 bg-gray-600 rounded-full px-2 py-1"
+                  >
                     <PiShareFat /> Share
-                  </div>
+                  </button>
                 </div>
               </>
             )}
@@ -370,6 +421,44 @@ const Posts = () => {
           You've seen it all! Time to create a post of your own?
         </p>
       )}
+
+      <Modal
+        show={sharePostId !== null}
+        onHide={closeShareModal}
+        customClass="w-[90%] max-w-md fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50"
+        submitBtn={null}
+      >
+        <div className="flex flex-col gap-y-4">
+          <p className="text-lg font-semibold">Share this post</p>
+          <div className="flex flex-row gap-x-2">
+            <input
+              readOnly
+              value={sharePostId ? getShareLink(sharePostId) : ""}
+              className="flex-1 bg-transparent border-[1px] border-textSecondary p-2 rounded-lg text-sm truncate"
+            />
+            <button
+              onClick={handleCopyLink}
+              className="bg-btnPrimary hover:bg-btnSecondary p-2 rounded-lg flex items-center gap-x-1 text-sm whitespace-nowrap"
+            >
+              <FaLink /> {linkCopied ? "Copied!" : "Copy"}
+            </button>
+          </div>
+          <div className="flex flex-row justify-center gap-x-4 text-2xl mt-2">
+            {shareTargets.map((target) => {
+              const Icon = target.Icon;
+              return (
+                <button
+                  key={target.key}
+                  onClick={() => handleShareClick(target)}
+                  className="p-3 bg-gray-700 rounded-full hover:bg-gray-600"
+                >
+                  <Icon />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
