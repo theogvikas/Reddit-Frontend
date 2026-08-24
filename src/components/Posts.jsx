@@ -96,9 +96,11 @@ const Posts = () => {
   const [editMedia, setEditMedia] = useState(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
-  const [followingIds, setFollowingIds] = useState(
-    (user?.following || []).map((id) => id.toString())
-  );
+  const [followingIds, setFollowingIds] = useState([]);
+
+  useEffect(() => {
+    setFollowingIds((user?.following || []).map((id) => id.toString()));
+  }, [user?.following]);
 
   const [sharePostId, setSharePostId] = useState(null);
   const [linkCopied, setLinkCopied] = useState(false);
