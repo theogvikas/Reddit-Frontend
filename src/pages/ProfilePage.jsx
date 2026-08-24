@@ -260,7 +260,7 @@ const ProfilePage = () => {
             <div>
               <p className="text-xl font-bold">{profile.username}</p>
               <p className="text-sm text-textSecondary">
-                {profile.followersCount} followers Â· {profile.followingCount} following
+                {profile.followersCount} followers {"\u00B7"} {profile.followingCount} following
               </p>
             </div>
           </div>

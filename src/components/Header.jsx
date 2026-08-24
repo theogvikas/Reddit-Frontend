@@ -64,6 +64,12 @@ const Header = () => {
     setProfile(false);
   };
 
+  // Navigate to own profile page and close the dropdown
+  const goToOwnProfile = () => {
+    navigate(`/user/${user.username}`);
+    setProfile(false);
+  };
+
   return (
     <div className="navbar flex flex-col ">
       <AuthModal
@@ -186,7 +192,10 @@ const Header = () => {
             ref={modalRef}
             className="flex flex-col desktop:w-[20%] w-full max-h-[50%] bg-bgSecondary gap-y-4 p-4 rounded-md"
           >
-            <button className="flex flex-row gap-x-2 hover:text-white items-center">
+            <button
+              onClick={goToOwnProfile}
+              className="flex flex-row gap-x-2 hover:text-white items-center"
+            >
               <div className="text-4xl">
                 <FaUserCircle />
               </div>{" "}
