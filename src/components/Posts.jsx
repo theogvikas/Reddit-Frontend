@@ -275,6 +275,13 @@ const Posts = () => {
     setCommentsLoading(false);
   };
 
+  const getDisplayedCommentCount = (post) => {
+    if (commentCounts[post._id] !== undefined) {
+      return commentCounts[post._id];
+    }
+    return post.commentCount ?? 0;
+  };
+
   const closeCommentModal = () => {
     setCommentPostId(null);
     setComments([]);
@@ -462,7 +469,7 @@ const Posts = () => {
                     onClick={() => openCommentModal(post._id)}
                     className="flex flex-row items-center gap-x-2 bg-gray-600 rounded-full px-2 py-1"
                   >
-                    <FaRegComment /> {commentCounts[post._id] ?? 0}
+                    <FaRegComment /> {getDisplayedCommentCount(post)}
                   </button>
                   <button
                     onClick={() => openShareModal(post._id)}
