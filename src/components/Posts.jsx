@@ -6,6 +6,7 @@ import { FaWhatsapp, FaXTwitter, FaFacebook, FaLink } from "react-icons/fa6";
 import { useEffect, useState } from "react";
 import { fetchPosts, handleVote, updatePost, deletePost } from "../api/postService";
 import { followUser } from "../api/userService";
+import { fetchComments, addComment, deleteComment } from "../api/commentService";
 import { useSelector } from "react-redux";
 import Modal from "./Modal";
 
@@ -101,6 +102,13 @@ const Posts = () => {
 
   const [sharePostId, setSharePostId] = useState(null);
   const [linkCopied, setLinkCopied] = useState(false);
+
+  const [commentPostId, setCommentPostId] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentCounts, setCommentCounts] = useState({});
 
   const getPosts = async () => {
     if (pageNo >= lastPage || loading) return;
@@ -253,6 +261,54 @@ const Posts = () => {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  const openCommentModal = async (postId) => {
+    setCommentPostId(postId);
+    setCommentText("");
+    setCommentsLoading(true);
+    const response = await fetchComments(postId);
+    if (response.isSuccess) {
+      setComments(response.comments);
+      setCommentCounts((curr) => ({ ...curr, [postId]: response.comments.length }));
+    } else {
+      setComments([]);
+    }
+    setCommentsLoading(false);
+  };
+
+  const closeCommentModal = () => {
+    setCommentPostId(null);
+    setComments([]);
+    setCommentText("");
+  };
+
+  const handleAddComment = async () => {
+    if (!commentText.trim() || !commentPostId) return;
+
+    setCommentSubmitting(true);
+    const response = await addComment(commentPostId, commentText.trim());
+    setCommentSubmitting(false);
+
+    if (response.isSuccess) {
+      setComments((curr) => [response.comment, ...curr]);
+      setCommentCounts((curr) => ({
+        ...curr,
+        [commentPostId]: (curr[commentPostId] || 0) + 1,
+      }));
+      setCommentText("");
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    const response = await deleteComment(commentId);
+    if (response.isSuccess) {
+      setComments((curr) => curr.filter((c) => c._id !== commentId));
+      setCommentCounts((curr) => ({
+        ...curr,
+        [commentPostId]: Math.max((curr[commentPostId] || 1) - 1, 0),
+      }));
+    }
+  };
+
   return (
     <div className="w-full p-5 desktop:border-x-[1px] desktop:min-h-[100vh] flex flex-col ">
       {loading ? (
@@ -402,9 +458,12 @@ const Posts = () => {
                       )}
                     </button>
                   </div>
-                  <div className="flex flex-row items-center gap-x-2 bg-gray-600 rounded-full px-2 py-1">
-                    <FaRegComment /> 0
-                  </div>
+                  <button
+                    onClick={() => openCommentModal(post._id)}
+                    className="flex flex-row items-center gap-x-2 bg-gray-600 rounded-full px-2 py-1"
+                  >
+                    <FaRegComment /> {commentCounts[post._id] ?? 0}
+                  </button>
                   <button
                     onClick={() => openShareModal(post._id)}
                     className="flex flex-row items-center gap-x-2 bg-gray-600 rounded-full px-2 py-1"
@@ -456,6 +515,64 @@ const Posts = () => {
                 </button>
               );
             })}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        show={commentPostId !== null}
+        onHide={closeCommentModal}
+        customClass="w-[90%] max-w-md fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 max-h-[80vh]"
+        submitBtn={null}
+      >
+        <div className="flex flex-col gap-y-4">
+          <p className="text-lg font-semibold">Comments</p>
+
+          <div className="flex flex-row gap-x-2">
+            <input
+              type="text"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Add a comment..."
+              className="flex-1 bg-transparent border-[1px] border-textSecondary p-2 rounded-lg text-sm"
+            />
+            <button
+              disabled={commentSubmitting || !commentText.trim()}
+              onClick={handleAddComment}
+              className="bg-btnPrimary hover:bg-btnSecondary disabled:bg-bgSecondary p-2 rounded-lg text-sm whitespace-nowrap"
+            >
+              {commentSubmitting ? "Posting..." : "Post"}
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-y-3 overflow-y-auto max-h-[50vh]">
+            {commentsLoading ? (
+              <p className="text-sm text-center text-textSecondary">Loading...</p>
+            ) : comments.length ? (
+              comments.map((comment) => (
+                <div
+                  key={comment._id}
+                  className="flex flex-row justify-between items-start gap-x-2 border-b border-[#ffffff29] pb-2"
+                >
+                  <div>
+                    <p className="text-sm font-semibold">{comment.user?.username}</p>
+                    <p className="text-sm">{comment.text}</p>
+                  </div>
+                  {comment.user?.username === user.username && (
+                    <button
+                      onClick={() => handleDeleteComment(comment._id)}
+                      className="text-xs text-red-500 whitespace-nowrap"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-center text-textSecondary">
+                No comments yet. Be the first!
+              </p>
+            )}
           </div>
         </div>
       </Modal>
