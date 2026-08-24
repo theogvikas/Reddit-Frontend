@@ -574,6 +574,13 @@ const Posts = () => {
               </p>
             )}
           </div>
+
+          <button
+            onClick={closeCommentModal}
+            className="self-center mt-2 py-2 px-4 rounded-full bg-bgSecondary hover:bg-[#ffffff29] text-sm"
+          >
+            Close
+          </button>
         </div>
       </Modal>
     </div>
