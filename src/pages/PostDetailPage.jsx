@@ -224,7 +224,10 @@ const PostDetailPage = () => {
         <div className="my-1 py-2 px-3 border-t-[0.5px] border-[#ffffff29] rounded-xl">
           <div className="flex flex-row justify-between text-sm">
             <div className="flex flex-row items-center gap-x-2">
-              <FaUser /> {post.createdBy.username}
+              <FaUser />{" "}
+              <Link to={`/user/${post.createdBy.username}`} className="hover:underline">
+                {post.createdBy.username}
+              </Link>
               <ul style={{ listStyleType: "disc", marginLeft: "18px" }}>
                 <li>{getTimeElapsed(post.createdAt)}</li>
               </ul>

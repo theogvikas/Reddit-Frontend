@@ -8,6 +8,7 @@ import { fetchPosts, handleVote, updatePost, deletePost } from "../api/postServi
 import { followUser } from "../api/userService";
 import { fetchComments, addComment, deleteComment } from "../api/commentService";
 import { useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 import Modal from "./Modal";
 
 function getTimeElapsed(date) {
@@ -330,7 +331,10 @@ const Posts = () => {
           >
             <div className="flex flex-row justify-between text-sm">
               <div className="flex flex-row items-center gap-x-2">
-                <FaUser /> {post.createdBy.username}
+                <FaUser />{" "}
+                <Link to={`/user/${post.createdBy.username}`} className="hover:underline">
+                  {post.createdBy.username}
+                </Link>
                 <ul style={{ listStyleType: "disc", marginLeft: "18px" }}>
                   <li>{getTimeElapsed(post.createdAt)}</li>
                 </ul>
