@@ -14,6 +14,43 @@ import { MdAdsClick } from "react-icons/md";
 import { AiOutlineMessage } from "react-icons/ai";
 import { FaRegBell } from "react-icons/fa6";
 import { IoLogOutOutline } from "react-icons/io5";
+import {
+  fetchNotifications,
+  fetchUnreadCount,
+  markNotificationsRead,
+} from "../api/notificationService";
+
+function getNotifTimeElapsed(date) {
+  const currentTime = new Date();
+  const givenTime = new Date(date);
+
+  const timeDifference = currentTime - givenTime;
+  const minutes = Math.floor(timeDifference / (1000 * 60));
+
+  if (minutes >= 24 * 60) {
+    const days = Math.floor(minutes / (24 * 60));
+    return `${days}d ago`;
+  } else if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+  } else if (minutes <= 0) {
+    return `just now`;
+  } else {
+    return `${minutes}m ago`;
+  }
+}
+
+function getNotifText(notification) {
+  const senderName = notification.sender?.username || "Someone";
+  if (notification.type === "follow") {
+    return `${senderName} started following you`;
+  } else if (notification.type === "vote") {
+    return `${senderName} voted on your post${notification.post?.title ? `: "${notification.post.title}"` : ""}`;
+  } else if (notification.type === "comment") {
+    return `${senderName} commented on your post${notification.post?.title ? `: "${notification.post.title}"` : ""}`;
+  }
+  return "New notification";
+}
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,6 +62,12 @@ const Header = () => {
   const dispatch = useDispatch();
   const [openProfile, setProfile] = useState(false);
   const modalRef = useRef();
+
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [openNotifications, setOpenNotifications] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const notifRef = useRef();
 
   // Function to toggle the menu
   const handleToggleMenu = (path) => {
@@ -39,9 +82,12 @@ const Header = () => {
       if (modalRef.current && !modalRef.current.contains(event.target)) {
         setProfile(false);
       }
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setOpenNotifications(false);
+      }
     };
 
-    if (openProfile) {
+    if (openProfile || openNotifications) {
       document.addEventListener("mousedown", handleClickOutside);
     } else {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -51,7 +97,56 @@ const Header = () => {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [openProfile, setProfile]);
+  }, [openProfile, openNotifications, setProfile]);
+
+  // Poll unread notification count while logged in
+  useEffect(() => {
+    if (!isUserLoggedIn) return;
+
+    const pollUnreadCount = async () => {
+      const response = await fetchUnreadCount();
+      if (response.isSuccess) {
+        setUnreadCount(response.count);
+      }
+    };
+
+    pollUnreadCount();
+    const intervalId = setInterval(pollUnreadCount, 20000);
+
+    return () => clearInterval(intervalId);
+  }, [isUserLoggedIn]);
+
+  const handleBellClick = async () => {
+    const opening = !openNotifications;
+    setOpenNotifications(opening);
+
+    if (opening) {
+      setNotifLoading(true);
+      const response = await fetchNotifications();
+      if (response.isSuccess) {
+        setNotifications(response.notifications);
+      }
+      setNotifLoading(false);
+    }
+  };
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.read) {
+      await markNotificationsRead(notification._id);
+      setUnreadCount((curr) => Math.max(curr - 1, 0));
+      setNotifications((curr) =>
+        curr.map((n) => (n._id === notification._id ? { ...n, read: true } : n))
+      );
+    }
+
+    setOpenNotifications(false);
+
+    if (notification.type === "follow") {
+      navigate(`/user/${notification.sender.username}`);
+    } else if (notification.post?._id) {
+      navigate(`/post/${notification.post._id}`);
+    }
+  };
 
   // Toggle login modal
   const handleLoginModal = () => {
@@ -140,7 +235,7 @@ const Header = () => {
             ...
           </button>
           {isUserLoggedIn && (
-            <div className="text-2xl flex flex-row items-center ">
+            <div className="text-2xl flex flex-row items-center relative">
               <button className="hover:bg-bgSecondary p-2 desktop:flex hidden rounded-full">
                 <MdAdsClick />
               </button>
@@ -156,9 +251,51 @@ const Header = () => {
                   Create
                 </span>
               </button>
-              <button className="hover:bg-bgSecondary p-2 rounded-full">
-                <FaRegBell />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={handleBellClick}
+                  className="hover:bg-bgSecondary p-2 rounded-full relative"
+                >
+                  <FaRegBell />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 bg-[#D93900] text-white text-[10px] leading-none rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {openNotifications && (
+                  <div
+                    ref={notifRef}
+                    className="absolute right-0 top-full mt-2 w-[320px] max-h-[400px] overflow-y-auto bg-bgSecondary rounded-md shadow-lg text-sm font-light z-[999999]"
+                  >
+                    <p className="p-3 font-semibold border-b border-[#ffffff29]">
+                      Notifications
+                    </p>
+                    {notifLoading ? (
+                      <p className="p-4 text-center text-textSecondary">Loading...</p>
+                    ) : notifications.length ? (
+                      notifications.map((notification) => (
+                        <button
+                          key={notification._id}
+                          onClick={() => handleNotificationClick(notification)}
+                          className={`w-full text-left p-3 border-b border-[#ffffff29] hover:bg-[#ffffff14] flex flex-col gap-y-1 ${
+                            notification.read ? "" : "bg-[#ffffff0d]"
+                          }`}
+                        >
+                          <span>{getNotifText(notification)}</span>
+                          <span className="text-xs text-textSecondary">
+                            {getNotifTimeElapsed(notification.createdAt)}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="p-4 text-center text-textSecondary">
+                        No notifications yet.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => setProfile((curr) => !curr)}
                 className="hover:bg-bgSecondary p-1 text-[28px] rounded-full"
