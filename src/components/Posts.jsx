@@ -235,7 +235,7 @@ const Posts = () => {
     }
   };
 
-  const getShareLink = (postId) => window.location.origin + "/?post=" + postId;
+  const getShareLink = (postId) => window.location.origin + "/post/" + postId;
 
   const openShareModal = (postId) => {
     setSharePostId(postId);

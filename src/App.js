@@ -8,6 +8,7 @@ import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import CreatePost from "./pages/NewPost";
 import ProtectedRoute from "./components/protectedRoute";
+import PostDetailPage from "./pages/PostDetailPage";
 
 function App() {
   const dispatch = useDispatch();
@@ -31,6 +32,7 @@ function App() {
                 path="/create-post"
                 element={<ProtectedRoute element={CreatePost} />}
               />
+              <Route path="/post/:postId" element={<PostDetailPage />} />
             </Routes>
           </div>
         </div>

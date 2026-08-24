@@ -10,6 +10,16 @@ export const fetchPosts = async (pageNo) => {
   }
 };
 
+// Function to get a single post by id
+export const fetchPost = async (postId) => {
+  try {
+    const response = await axiosInstance.get(`/post/${postId}`);
+    return response.data;
+  } catch (error) {
+    return { isSuccess: false, errMsg: "Something went wrong!" };
+  }
+};
+
 // Function to handle vote
 export const handleVote = async (postId, voteType) => {
   try {
